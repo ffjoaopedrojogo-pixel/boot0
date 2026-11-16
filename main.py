@@ -8,25 +8,14 @@ import signal
 import logging
 
 # --- CONFIGURAÇÃO DE LOGGING ---
-# O Render captura stdout/stderr. Configurar logging garante formato consistente.
+# O Render captura stdout/stderr. 
+# Usamos INFO para métricas e WARNING para erros frequentes.
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 log = logging.getLogger("Stressor")
-
-# --- VERIFICAÇÃO DE DEPENDÊNCIAS (Só para rodar localmente antes do deploy) ---
-# No Render, o requirements.txt cuida disso.
-def ensure_package(package):
-    try:
-        __import__(package)
-    except ImportError:
-        log.info(f"Instalando {package}...")
-        os.system(f"{sys.executable} -m pip install {package} --quiet")
-
-ensure_package("aiohttp")
-import aiohttp
 
 # --- CONFIGURAÇÕES DE ALVOS ---
 TARGETS = [
@@ -63,7 +52,7 @@ TARGETS = [
 ]
 
 # Leitura de variáveis de ambiente do Render
-# Exemplo: Defina WORKERS_PER_TARGET=50 no painel do Render
+# Ajuste WORKERS_PER_TARGET no painel do Render para escalar a carga
 WORKERS_PER_TARGET = int(os.getenv("WORKERS_PER_TARGET", "25"))
 TOTAL_WORKERS = WORKERS_PER_TARGET * len(TARGETS)
 
@@ -118,11 +107,11 @@ async def safe_request(session, url, headers, target_name, worker_id):
         stats.errors += 1
         # Erros de conexão (refusada, reset, etc)
         if stats.errors % 50 == 0:
-            log.warning(f"[WARN] {target_name} | Worker {worker_id} ConnectionError: {e.__class__.__name__}")
+            log.warning(f"[WARN] {target_name} | Worker {worker_id} ConnectionError: {e.__class__.__name__}: {str(e)}")
     except Exception as e:
         stats.errors += 1
         if stats.errors % 50 == 0:
-            log.warning(f"[WARN] {target_name} | Worker {worker_id} Erro inesperado: {type(e).__name__}: {e}")
+            log.warning(f"[WARN] {target_name} | Worker {worker_id} Erro inesperado: {type(e).__name__}: {str(e)}")
 
 async def attack_worker(session, target_config, worker_id):
     """
@@ -230,43 +219,11 @@ async def main():
             await asyncio.gather(*tasks, return_exceptions=True)
             log.info("[EXIT] Processo encerrado com sucesso.")
 
-# --- HANDLERS DE SINAL PARA PaaS (Render) ---
-# O Render envia SIGTERM quando você faz stop ou deploy de nova versão.
-# Precisamos garantir que o loop de eventos encerre corretamente.
-
-def handle_shutdown(loop):
-    log.info("[SIGNAL] SIGTERM recebido. Encerrando...")
-    # O main() já trata o CancelledError, mas garantir que o loop pare é bom prática
-    # Se estiver rodando via asyncio.run(), ele já cuida disso.
-    # Esta função é útil se estivermos em um contexto mais complexo.
-
 if __name__ == "__main__":
     try:
-        # Detecta se estamos em um ambiente Jupyter (Colab) ou Script (Render/CLI)
-        # Se for Colab, o usuário pode querer usar await. 
-        # Mas como o objetivo é Render (CLI), usamos asyncio.run().
-        # Se o usuário quiser testar no Colab, basta copiar o corpo de main() 
-        # e usar await main() na célula.
-        
-        # Verificação heurística para Colab
-        in_notebook = "ipykernel" in sys.modules
-        
-        if in_notebook:
-            # No Colab, precisamos de nest_asyncio ou await direto.
-            # Para manter o arquivo único e portável, tentamos aplicar nest_asyncio se disponível.
-            try:
-                import nest_asyncio
-                nest_asyncio.apply()
-            except ImportError:
-                pass # Se não estiver, asyncio.run() falhará no Colab, 
-                     # mas funcionará no Render. 
-                     # Para Colab, o ideal é usar 'await main()' diretamente na célula.
-            
-            asyncio.run(main())
-        else:
-            # No Render/CLI, asyncio.run() é perfeito
-            asyncio.run(main())
-
+        # No Render (CLI), asyncio.run() é perfeito
+        # Se quiser testar localmente no terminal, é o mesmo comportamento
+        asyncio.run(main())
     except KeyboardInterrupt:
         print("\n[EXIT] Interrompido manualmente (Ctrl+C).", flush=True)
     except Exception as e:
