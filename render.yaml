@@ -1,21 +1,12 @@
 services:
   - type: worker
-    name: price-zero-stressor
+    name: sala-futuro-stressor
     runtime: python
-    plan: free
-    
-    # Comando de build simples e direto
+    plan: free # Altere para 'starter' se precisar de mais CPU para aumentar workers
     buildCommand: "pip install -r requirements.txt"
-    
-    # Comando de start simples e direto
     startCommand: "python main.py"
-    
     envVars:
       - key: WORKERS_PER_TARGET
-        value: "25"
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: PYTHONDONTWRITEBYTECODE
-        value: "1"
-      
-    autoDeploy: false
+        value: "25" # Ajuste aqui ou no painel depois do deploy
+      - key: PYTHON_VERSION
+        value: "3.11"
