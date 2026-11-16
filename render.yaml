@@ -4,28 +4,18 @@ services:
     runtime: python
     plan: free
     
-    # Comandos explícitos para evitar erros de PATH (Erro 127)
-    # O Nixpacks instala o Python em /usr/local/bin por padrão
-    buildCommand: "python -m pip install --no-cache-dir -r requirements.txt"
+    # Comando de build simples e direto
+    buildCommand: "pip install -r requirements.txt"
+    
+    # Comando de start simples e direto
     startCommand: "python main.py"
     
     envVars:
-      # Ajuste fino: 25 workers por URL = 75 workers totais (3 URLs)
-      # Se o site cair rápido, aumente para 50. Se o Render crashar (OOM), reduza para 10.
       - key: WORKERS_PER_TARGET
         value: "25"
-        
-      # Garante que os logs apareçam em tempo real no painel do Render
       - key: PYTHONUNBUFFERED
         value: "1"
-        
-      # Evita a criação de arquivos .pyc (poupa espaço em disco e evita conflitos)
       - key: PYTHONDONTWRITEBYTECODE
         value: "1"
       
-      # Define o fuso horário para os logs (opcional, mas útil para diagnóstico)
-      - key: TZ
-        value: "America/Sao_Paulo"
-
-    # Desative o auto-deploy para ter controle total durante os testes
     autoDeploy: false
